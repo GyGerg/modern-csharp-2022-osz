@@ -14,6 +14,7 @@ namespace X4TUEV.FakeEmailClient
     {
         readonly DataTable dataTable;
 
+
         public EmailListView()
         {
             dataTable = new DataTable();
@@ -30,33 +31,21 @@ namespace X4TUEV.FakeEmailClient
             //dataTable.Columns["hash"]!.MaxLength = 1;
 
 
-            Application.MainLoop.Invoke(() =>
-            {
-                FrameView dialog = new("Loading")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.Center(),
-                    Width = 16,
-                    Height = 8,
-                    ColorScheme = Colors.Dialog,
-                    CanFocus = false,
-                    Border = new Border()
-                    {
-                        Effect3DOffset = new Point(1, 1),
-                        Effect3D = true,
-                        BorderStyle = BorderStyle.Rounded,
-                        BorderThickness = new Thickness(1),
-                    }
 
-                };
-                Add(dialog);
-                Label dialogText = new("Please wait...")
-                {
-                    X = Pos.Center(),
-                    Y = Pos.Center(),
-                    TextAlignment = TextAlignment.Centered,
-                };
-                dialog.Add(dialogText);
+
+            Store.emailsFiltered.CollectionChanged += EmailsFiltered_CollectionChanged;
+
+            Table = dataTable;
+            Application.MainLoop.Invoke(Init);
+        }
+
+        async void Init()
+        {
+            Application.MainLoop.MainIteration();
+            
+
+            await Task.Run(async () =>
+            {
                 foreach (var email in Store.emailsFiltered)
                 {
                     var newRow = dataTable.NewRow();
@@ -64,16 +53,14 @@ namespace X4TUEV.FakeEmailClient
                     newRow[nameof(Email.Title)] = email.Title;
                     newRow[nameof(Email.To)] = email.To;
                     newRow["hash"] = email.GetHashCode();
-                    dataTable.Rows.Add(newRow);
+                    Application.MainLoop.Invoke(() =>
+                    {
+                        dataTable.Rows.Add(newRow);
+                        SetNeedsDisplay();
+                    }); // idk if it does anything fancy
                 }
-                Remove(dialog);
-                dialog.Dispose();
-
+                await Task.Delay(100);
             });
-
-            Store.emailsFiltered.CollectionChanged += EmailsFiltered_CollectionChanged;
-
-            Table = dataTable;
         }
 
         protected override void Dispose(bool disposing)

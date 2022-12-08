@@ -17,6 +17,9 @@ namespace X4TUEV.FakeEmailClient
         readonly EmailListView emailListView;
 
 
+        object? timeoutToken;
+
+
         NStack.ustring _queryString = "";
         NStack.ustring queryString 
         { 
@@ -25,11 +28,20 @@ namespace X4TUEV.FakeEmailClient
             {
                 _queryString = value;
                 var asStr = value.ToString() ?? "";
-                Store.emailsFiltered.Clear();
-                foreach(var email in GenerateFilter())
+                if(timeoutToken != null)
                 {
-                    Store.emailsFiltered.Add(email);
+                    _ = Application.MainLoop.RemoveTimeout(timeoutToken);
                 }
+                timeoutToken = Application.MainLoop.AddTimeout(TimeSpan.FromMilliseconds(200), (mainLoop) =>
+                {
+                    Store.emailsFiltered.Clear();
+                    foreach (var email in GenerateFilter())
+                    {
+                        Store.emailsFiltered.Add(email);
+                    }
+                    timeoutToken = null;
+                    return false;
+                });
             } 
         }
         public EmailClientScreen()
@@ -85,7 +97,7 @@ namespace X4TUEV.FakeEmailClient
             };
             queryField.TextChanged += (newText) =>
             {
-                queryString = newText;
+                queryString = queryField.Text;
             };
             emailsContainer.Add(queryLabel, queryField);
             emailListView = new()
@@ -158,7 +170,7 @@ namespace X4TUEV.FakeEmailClient
 
         }
 
-        void GenerateUsers(int count, Random rnd)
+        Task<int> GenerateUsers(int count, Random rnd)
         {
             for (int i = 0; i < count; i++)
             {
@@ -174,9 +186,10 @@ namespace X4TUEV.FakeEmailClient
                 Store.userAddresses.Add(emailAddr);
                 Store.users.Add(user);
             }
+            return Task<int>.FromResult(0);
         }
 
-        void GenerateMails(int count, Random rnd)
+        Task<int> GenerateMails(int count, Random rnd)
         {
             int userCnt = Store.users.Count;
             for (int i = 0; i < count; i++)
@@ -191,11 +204,16 @@ namespace X4TUEV.FakeEmailClient
                     Title: string.Join(' ', Faker.Lorem.Words(rnd.Next(1, 5)))
                 ));
             }
+            return Task<int>.FromResult(0);
         }
         IEnumerable<Email> FilterByKeyword(IEnumerable<Email> source, string keyword, string searchString) => keyword.ToLower() switch
         {
             "from" => source.Where(mail => searchString == "*" ? true : mail.From.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)),
             "to" => source.Where((mail => searchString == "*" ? true : mail.To.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase))),
+            "first" => int.TryParse(searchString, out int num) && num > 0 ? source.Take(num) : source,
+            "last" => int.TryParse(searchString, out int num) && num > 0 ? source.TakeLast(num) : source,
+            "before" => DateTime.TryParse(searchString, out var date) ? source.Where(mail => mail.Sent >= date) : source,
+            "after" => DateTime.TryParse(searchString, out var date) ? source.Where(mail => mail.Sent <= date) : source,
             "order_by_desc" => source.OrderByDescending(mail => searchString switch
             {
                 "title" => mail.Title,
@@ -217,7 +235,9 @@ namespace X4TUEV.FakeEmailClient
         IEnumerable<Email> FilterByKeyword(IEnumerable<Email> source, string searchString) => searchString switch
         {
             _ => source.Where(email =>
-            email.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+            email.From.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)    ||
+            email.To.ToString().Contains(searchString, StringComparison.OrdinalIgnoreCase)      ||
+            email.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase)              ||
             email.Content.Contains(searchString, StringComparison.OrdinalIgnoreCase))
         };
 
