@@ -21,20 +21,55 @@ namespace X4TUEV.FakeEmailClient
             dataTable.Columns.Add(new DataColumn(nameof(Email.Title), typeof(string)) { ReadOnly = true });
             dataTable.Columns.Add(new DataColumn(nameof(Email.To), typeof(string)) { ReadOnly = true });
             dataTable.Columns.Add(new DataColumn("hash", typeof(int)));
+
+            CellActivated += (cellEventArgs) =>
+            {
+                
+                Application.Run(new EmailWindow(Store.emailsFiltered[cellEventArgs.Row]));
+            };
             //dataTable.Columns["hash"]!.MaxLength = 1;
 
 
-            foreach(var email in Store.emailsFiltered)
+            Application.MainLoop.Invoke(() =>
             {
-                var newRow = dataTable.NewRow();
-                newRow[nameof(Email.From)] = email.From;
-                newRow[nameof(Email.Title)] = email.Title;
-                newRow[nameof(Email.To)] = email.To;
-                newRow["hash"] = email.GetHashCode();
-                dataTable.Rows.Add(newRow);
-            }
+                FrameView dialog = new("Loading")
+                {
+                    X = Pos.Center(),
+                    Y = Pos.Center(),
+                    Width = 16,
+                    Height = 8,
+                    ColorScheme = Colors.Dialog,
+                    CanFocus = false,
+                    Border = new Border()
+                    {
+                        Effect3DOffset = new Point(1, 1),
+                        Effect3D = true,
+                        BorderStyle = BorderStyle.Rounded,
+                        BorderThickness = new Thickness(1),
+                    }
 
-            
+                };
+                Add(dialog);
+                Label dialogText = new("Please wait...")
+                {
+                    X = Pos.Center(),
+                    Y = Pos.Center(),
+                    TextAlignment = TextAlignment.Centered,
+                };
+                dialog.Add(dialogText);
+                foreach (var email in Store.emailsFiltered)
+                {
+                    var newRow = dataTable.NewRow();
+                    newRow[nameof(Email.From)] = email.From;
+                    newRow[nameof(Email.Title)] = email.Title;
+                    newRow[nameof(Email.To)] = email.To;
+                    newRow["hash"] = email.GetHashCode();
+                    dataTable.Rows.Add(newRow);
+                }
+                Remove(dialog);
+                dialog.Dispose();
+
+            });
 
             Store.emailsFiltered.CollectionChanged += EmailsFiltered_CollectionChanged;
 

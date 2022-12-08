@@ -4,12 +4,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Net;
+using System.Xml.Serialization;
 
 namespace X4TUEV.FakeEmailClient
 {
-    public record class Email(EmailAddress From, EmailAddress To, string Content, DateTime Sent, string Title = "Untitled")
+    public record class Email(
+        EmailAddress From, 
+        EmailAddress To, 
+        string Content, 
+        DateTime Sent, 
+        string Title = "Untitled")
     {
-
+        // for a failed xml attempt
+        public Email() : this(new EmailAddress("a@a.a"), new EmailAddress("a@a.a"), "", DateTime.MinValue) { }
     }
 
     public record class EmailAddress(string name, string provider)

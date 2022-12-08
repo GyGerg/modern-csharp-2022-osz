@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 using Terminal.Gui;
 
@@ -14,7 +16,6 @@ namespace X4TUEV.FakeEmailClient
 
         readonly EmailListView emailListView;
 
-        IEnumerable<Email> emailsFiltered;
 
         NStack.ustring _queryString = "";
         NStack.ustring queryString 
@@ -25,22 +26,12 @@ namespace X4TUEV.FakeEmailClient
                 _queryString = value;
                 var asStr = value.ToString() ?? "";
                 Store.emailsFiltered.Clear();
-                var res = GenerateFilter();
-                //var res = Store.emails.Where(email => email.From.ToString().Contains(asStr, StringComparison.OrdinalIgnoreCase)
-                //|| email.To.ToString().Contains(asStr, StringComparison.OrdinalIgnoreCase)
-                //|| email.Title.Contains(asStr, StringComparison.InvariantCultureIgnoreCase)
-                //|| email.Content.Contains(asStr, StringComparison.OrdinalIgnoreCase)
-                //);
-                foreach(var email in res)
+                foreach(var email in GenerateFilter())
                 {
                     Store.emailsFiltered.Add(email);
                 }
-                //countLabel.Text = $"Count: {Store.emailsFiltered.Count}";
-                //countLabel.Text = asStr;
-                countLabel.Text = Store.emails.First().From.ToString();
             } 
         }
-        Label countLabel;
         public EmailClientScreen()
         {
             Random rnd = new();
@@ -58,7 +49,6 @@ namespace X4TUEV.FakeEmailClient
 
             GenerateMails(randomMailCount, rnd);
 
-            emailsFiltered = Store.emails.AsEnumerable();
             Store.emailsFiltered = new (Store.emails);
 
 
@@ -67,17 +57,19 @@ namespace X4TUEV.FakeEmailClient
                 X = Pos.Left(this) + 1,
                 Y = Pos.Center(),
             };
-            countLabel = new("Count: pending")
-            {
-                X = Pos.Left(quitButton),
-                Y = Pos.Bottom(quitButton) + 5
-            };
-            FrameView emailsContainer = new("E-mails")
+
+            FrameView emailsContainer = new("E-mails -- Double-click on a row to open your mail")
             {
                 X = Pos.Right(quitButton)+1,
                 Y = 1,
                 Width = Dim.Fill(),
                 Height = Dim.Fill()
+            };
+            Button exportButton = new("Export")
+            {
+                X = 0,
+                Y = Pos.Bottom(quitButton)+1,
+                AutoSize = true,
             };
 
             Label queryLabel = new("Query: ")
@@ -103,9 +95,66 @@ namespace X4TUEV.FakeEmailClient
                 Width = Dim.Fill(),
                 Height = Dim.Fill(),
             };
+
             emailsContainer.Add(emailListView);
-            Add(emailsContainer, quitButton, countLabel);
+
+            Add(emailsContainer, quitButton, exportButton);
+
             quitButton.Clicked += () => RequestStop();
+
+            exportButton.Clicked += async () =>
+            {
+                int res = MessageBox.Query("Export", "Would you like to export your e-mails?\n", "Export all", "Filtered only", "Cancel");
+                if(res == 0 || res == 1)
+                {
+                    bool exportAll = res == 0;
+
+                    SaveDialog saveDialog = new SaveDialog("Export E-mails", "You can pick JSON or JSON (or JSON) for export.", new() {"json"});
+                    Application.Run(saveDialog);
+                    
+                    if(!saveDialog.Canceled)
+                    {
+                        if (saveDialog.FileName.Length < 1 || saveDialog.FilePath.IsEmpty)
+                        {
+                            MessageBox.ErrorQuery("Error", "At least pick a name (or empty filepath)", "Damn:(");
+                            return;
+                        }
+                        var pathString = saveDialog.FilePath.ToString()!;
+                        /*if(pathString.EndsWith("xml"))
+                        {
+                            pathString.Insert(pathString.Length-3, ".");
+                        }
+                        else */if(pathString.EndsWith("json"))
+                        {
+                            pathString = pathString.Insert(pathString.Length-4, ".");
+                        }
+                        var fileEnd = pathString.Split('.').LastOrDefault() ?? "";
+                        MessageBox.Query($"FileEnd: {saveDialog.FileName}", $"Full path: \n{pathString}", "Close");
+
+                        try
+                        {
+                            using FileStream fileStream = File.Create(saveDialog.FilePath.ToString()!);
+                            switch (fileEnd)
+                            {
+                                case "json":
+                                    await JsonSerializer.SerializeAsync<IEnumerable<Email>>(fileStream, exportAll ? Store.emails : Store.emailsFiltered);
+                                    MessageBox.Query("File", "Success!", "Thanks");
+                                    break;
+                                /*case "xml":
+                                    XmlSerializer xmlSerializer = new(typeof(List<Email>));
+                                    xmlSerializer.Serialize(fileStream, new List<Email>(exportAll ? Store.emails : Store.emailsFiltered));
+                                    break;*/
+                                default:
+                                    throw new ArgumentException("Invalid file format");
+                            }
+                        }
+                        catch(Exception ex)
+                        {
+                            MessageBox.ErrorQuery("Error", ex.Message, "OK");
+                        }
+                    }
+                }
+            };
 
         }
 
@@ -165,10 +214,12 @@ namespace X4TUEV.FakeEmailClient
             }).AsEnumerable(),
             _ => source,
         };
-        IEnumerable<Email> FilterByKeyword(IEnumerable<Email> source, string searchString) =>
-            source.Where(email =>
+        IEnumerable<Email> FilterByKeyword(IEnumerable<Email> source, string searchString) => searchString switch
+        {
+            _ => source.Where(email =>
             email.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-            email.Content.Contains(searchString, StringComparison.OrdinalIgnoreCase));
+            email.Content.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+        };
 
         IEnumerable<Email> GenerateFilter()
         {
