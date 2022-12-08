@@ -7,7 +7,7 @@ using System.Net;
 
 namespace X4TUEV.FakeEmailClient
 {
-    public record class Email(EmailAddress from, EmailAddress to, string content)
+    public record class Email(EmailAddress From, EmailAddress To, string Content, DateTime Sent, string Title = "Untitled")
     {
 
     }
@@ -22,7 +22,7 @@ namespace X4TUEV.FakeEmailClient
             }
 
             var split = input.Split('@');
-            if(split.Length != 2 || split[1].Count(x => x == '.') != 1) { 
+            if(split.Length != 2 || split[1].Count(x => x == '.') < 1) { 
                 throw new ArgumentException($"{input} is not a valid email address!");
             }
             name = split[0];

@@ -20,10 +20,6 @@ Application.Init();
 Application.Run<TopLevelWindow>();
 
 Application.Shutdown();
-if (Application.Top is LoginScreen lgn)
-{
-    Console.WriteLine("ye ez login volt, zsír");
-}
 
 public class TopLevelWindow : Window
 {
@@ -39,18 +35,23 @@ public class TopLevelWindow : Window
 
         Label infoLabel = new("Sorry if windows are \"jumpy\" on drag, not my fault");
 
-        Button loginBtn = new Button("Login")
+        Button loginBtn = new("Login")
         {
             X = Pos.Center(),
             Y = Pos.Center()
         };
         Add(infoLabel, loginBtn);
-        loginBtn.Clicked += async () =>
+        loginBtn.Clicked += () =>
         {
             Application.Run(new LoginScreen());
-            if(user == null)
+            if(Store.currentUser == null)
             {
                 MessageBox.Query("Oopsie", "Please log in to continue", "OK", "no fuk u");
+            }
+            else
+            {
+                Application.Run(new EmailClientScreen());
+                Application.RequestStop();
             }
         };
 

@@ -100,10 +100,9 @@ namespace X4TUEV.FakeEmailClient
                 _ = MessageBox.ErrorQuery("Exception", ex.Message);
                 return;
             }
-
+            Store.currentUser = new User(usernameField.Text.ToString() ?? "admin", passwordField.Text.ToString() ?? "admin", email);
 
             RequestStop();
-
         }
     }
 }
